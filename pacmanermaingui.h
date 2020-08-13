@@ -51,6 +51,7 @@ public slots:
     void querySlot(QString target, QueryMode queryMode, MatchMode matchMode, QTableWidget* table);
     void baseTableMenu(QPoint);
     void showPkgInfoViewer(PkgItem* item);
+    void aurinfoSearchFinished(QVector<PkgItem*> result);
 
 private:
     Ui::PacmanerMainGui *ui;

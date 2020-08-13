@@ -198,245 +198,40 @@ void PacmanerMainGui::showPkgInfoViewer(PkgItem *item)
         lay->addWidget(new QLabel(tr("正在检索 %1 包AUR信息，请稍候。").arg(item->pkgname)));
         dialog->setLayout(lay);
 
-        dialog->show();
 
-        QNetworkAccessManager *manager =  new QNetworkAccessManager(this);
+        QueryThread *subQueryThread = new QueryThread;
+        subQueryThread->moveToThread(mainQueryThread);
 
-        connect(manager, &QNetworkAccessManager::finished,[=](QNetworkReply* reply)
-        {
-            qDebug()<<"Query Finished";
+        void (PacmanerMainGui::*pQuerySignal)(QString target, QueryMode queryMode, MatchMode matchMode) = &PacmanerMainGui::querySignal;
+        void (QueryThread::*pStartQuery)(QString target, QueryMode queryMode, MatchMode matchMode) = &QueryThread::startQuery;
+        connect(this,pQuerySignal,subQueryThread,pStartQuery,Qt::QueuedConnection);
 
-            QNetworkReply::NetworkError err = reply->error();
-            if(err != QNetworkReply::NoError)
-            {
-                qDebug() << "Failed: " << reply->errorString();
-            }
-            else
-            {
-                QByteArray buf = reply->readAll();
-
-                // Convert to JSON
-                QJsonParseError err;
-                QJsonDocument docment = QJsonDocument::fromJson(buf, &err);
-
-                if(err.error != QJsonParseError::NoError)
-                {
-                    qDebug()<<"Can't import json data.";
-                    exit(0);
-                }
-                else
-                {
-                    // "results" Array
-                    QJsonArray resultsArr = docment.object().value("results").toArray();
-                    for(auto item : resultsArr)
-                    {
-                        QJsonObject itemObj = item.toObject();
-
-                        qlonglong id = itemObj.value("ID").toInt();
-                        qlonglong pkgbaseid = itemObj.value("PackageBaseID").toInt();
-                        QString pkgname = itemObj.value("Name").toString();
-                        QString pkgbase = "";
-                        QString arch = "";
-                        QString pkgver = itemObj.value("Version").toString().section('-',0,0);
-                        int pkgrel = itemObj.value("Version").toString().section('-',1,1).toInt();
-                        int epoch = 1;
-                        QString pkgdesc = itemObj.value("Description").toString();
-                        QString url = itemObj.value("URL").toString();
-                        int numvotes = itemObj.value("NumVotes").toInt();
-                        double popularity = itemObj.value("Popularity").toDouble();
-                        QString outofdate = itemObj.value("OutOfDate").toString();
-                        qlonglong firstsubmitted = itemObj.value("FirstSubmitted").toInt();
-                        qlonglong lastmodified = itemObj.value("LastModified").toInt();
-                        QString urlpath = itemObj.value("URLPath").toString();
-
-                        QVector<QString> maintainers;
-                        QJsonValue maintainersValue = itemObj.value("maintainers");
-                        if(maintainersValue.isArray())
-                        {
-                            QJsonArray maintainersArr = maintainersValue.toArray();
-
-                            for(auto maintainerItem : maintainersArr)
-                            {
-                                maintainers.push_back(maintainerItem.toString());
-                            }
-                        }
-                        else
-                            maintainers.push_back(maintainersValue.toString());
-
-                        QString packager = itemObj.value("packager").toString();
-
-                        QVector<QString> licenses;
-                        QJsonValue licensesValue = itemObj.value("License");
-                        if(licensesValue.isArray())
-                        {
-                            QJsonArray licensesArr = licensesValue.toArray();
-
-                            for(auto licenseItem : licensesArr)
-                            {
-                                licenses.push_back(licenseItem.toString());
-                            }
-                        }
-                        else
-                            licenses.push_back(licensesValue.toString());
-
-                        QVector<QString> conflicts;
-                        QJsonValue conflictsValue = itemObj.value("Conflicts");
-                        if(conflictsValue.isArray())
-                        {
-                            QJsonArray conflictsArr = conflictsValue.toArray();
-
-                            for(auto conflictItem : conflictsArr)
-                            {
-                                conflicts.push_back(conflictItem.toString());
-                            }
-                        }
-                        else
-                            conflicts.push_back(conflictsValue.toString());
-
-                        QVector<QString> provides;
-                        QJsonValue providesValue = itemObj.value("Provides");
-                        if(providesValue.isArray())
-                        {
-                            QJsonArray providesArr = providesValue.toArray();
-
-                            for(auto provideItem : providesArr)
-                            {
-                                provides.push_back(provideItem.toString());
-                            }
-                        }
-                        else
-                            provides.push_back(providesValue.toString());
-
-                        QVector<QString> replaces;
-                        QJsonValue replacesValue = itemObj.value("Replaces");
-                        if(replacesValue.isArray())
-                        {
-                            QJsonArray replacesArr = replacesValue.toArray();
-
-                            for(auto replaceItem : replacesArr)
-                            {
-                                replaces.push_back(replaceItem.toString());
-                            }
-                        }
-                        else
-                            replaces.push_back(replacesValue.toString());
-
-                        QVector<QString> depends;
-                        QJsonValue dependsValue = itemObj.value("Depends");
-                        if(dependsValue.isArray())
-                        {
-                            QJsonArray dependsArr = dependsValue.toArray();
-
-                            for(auto dependItem : dependsArr)
-                            {
-                                depends.push_back(dependItem.toString());
-                            }
-                        }
-                        else
-                            depends.push_back(dependsValue.toString());
-
-                        QVector<QString> optdepends;
-                        QJsonValue optdependsValue = itemObj.value("OptDepends");
-                        if(optdependsValue.isArray())
-                        {
-                            QJsonArray optdependsArr = optdependsValue.toArray();
-
-                            for(auto optdependItem : optdependsArr)
-                            {
-                                optdepends.push_back(optdependItem.toString());
-                            }
-                        }
-                        else
-                            optdepends.push_back(optdependsValue.toString());
-
-                        QVector<QString> makedepends;
-                        QJsonValue makedependsValue = itemObj.value("MakeDepends");
-                        if(makedependsValue.isArray())
-                        {
-                            QJsonArray makedependsArr = makedependsValue.toArray();
-
-                            for(auto makedependItem : makedependsArr)
-                            {
-                                makedepends.push_back(makedependItem.toString());
-                            }
-                        }
-                        else
-                            makedepends.push_back(makedependsValue.toString());
-
-                        QVector<QString> checkdepends;
-                        QJsonValue checkdependsValue = itemObj.value("CheckDepends");
-                        if(checkdependsValue.isArray())
-                        {
-                            QJsonArray checkdependsArr = checkdependsValue.toArray();
-
-                            for(auto checkdependItem : checkdependsArr)
-                            {
-                                checkdepends.push_back(checkdependItem.toString());
-                            }
-                        }
-                        else
-                            checkdepends.push_back(checkdependsValue.toString());
-
-                        QVector<QString> groups;
-                        QJsonValue groupsValue = itemObj.value("Groups");
-                        if(groupsValue.isArray())
-                        {
-                            QJsonArray groupsArr = groupsValue.toArray();
-
-                            for(auto groupItem : groupsArr)
-                            {
-                                groups.push_back(groupItem.toString());
-                            }
-                        }
-                        else
-                            groups.push_back(groupsValue.toString());
-
-                        QVector<QString> keywords;
-                        QJsonValue keywordsValue = itemObj.value("Keywords");
-                        if(keywordsValue.isArray())
-                        {
-                            QJsonArray keywordsArr = keywordsValue.toArray();
-
-                            for(auto keywordItem : keywordsArr)
-                            {
-                                keywords.push_back(keywordItem.toString());
-                            }
-                        }
-                        else
-                            keywords.push_back(keywordsValue.toString());
-
-
-                        AurPkgItem *tmpItem
-                                = new AurPkgItem(pkgname,pkgbase,arch,
-                                                 pkgver,pkgrel,epoch,
-                                                 pkgdesc,url,maintainers,
-                                                 licenses,conflicts,provides,
-                                                 replaces,depends,optdepends,
-                                                 makedepends,checkdepends,groups,
-                                                 id,pkgbaseid,numvotes,
-                                                 popularity,outofdate,firstsubmitted,
-                                                 lastmodified,urlpath,keywords);
-
-                        tmpItem->printInfo();
-
-                        dialog->close();
-
-                        PkgInfoViewer *viewer = new PkgInfoViewer(tmpItem, this);
-                        viewer->show();
-                    }
-
-                }
-            }
+        // Result
+        void (QueryThread::*pQueryFinished)(QVector<PkgItem*>) = &QueryThread::queryFinished;
+        void (PacmanerMainGui::*pAurinfoSearchFinished)(QVector<PkgItem*>) = &PacmanerMainGui::aurinfoSearchFinished;
+        connect(subQueryThread, pQueryFinished, this, pAurinfoSearchFinished);
+        connect(subQueryThread, &QueryThread::queryFinished,[=](){
+            dialog->close();
         });
-        QNetworkRequest request;
-        request.setUrl(tr("https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=%1").arg(item->pkgname));
+        connect(subQueryThread, &QueryThread::queryFinished,subQueryThread,&QueryThread::deleteLater);
 
-        manager->get(request);
+        emit querySignal(item->pkgname,QueryMode::AurInfo,MatchMode::OnlyName);
+
+
+
+        dialog->exec();
+
     }
     else
     {
         PkgInfoViewer *viewer = new PkgInfoViewer(item, this);
         viewer->show();
     }
+}
+
+void PacmanerMainGui::aurinfoSearchFinished(QVector<PkgItem*> result)
+{
+    PkgInfoViewer *viewer = new PkgInfoViewer(result.at(0), this);
+    viewer->show();
 }
 
