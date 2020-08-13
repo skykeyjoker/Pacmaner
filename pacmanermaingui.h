@@ -22,6 +22,8 @@
 #include <QMetaType>
 #include <QModelIndex>
 #include <QDialog>
+#include <QProcess>
+#include <QPixmap>
 
 #include "aurpkgitem.h"
 #include "officialpkgitem.h"
@@ -43,6 +45,7 @@ public:
     PacmanerMainGui(QWidget *parent = nullptr);
     ~PacmanerMainGui();
 
+
 signals:
     void querySignal(QString target, QueryMode queryMode, MatchMode matchMode);
     void searchBtnClicked(QString target, QueryMode queryMode, MatchMode matchMode, QTableWidget* table);
@@ -52,6 +55,7 @@ public slots:
     void baseTableMenu(QPoint);
     void showPkgInfoViewer(PkgItem* item);
     void aurinfoSearchFinished(QVector<PkgItem*> result);
+
 
 private:
     Ui::PacmanerMainGui *ui;

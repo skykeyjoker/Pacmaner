@@ -55,10 +55,10 @@ PacmanerMainGui::PacmanerMainGui(QWidget *parent)
 
     table_baseTab->setColumnCount(5);
     table_baseTab->setHorizontalHeaderLabels(QStringList()<<"状态"<<"AUR"<<"包名"<<"版本"<<"描述");
-    table_baseTab->setColumnWidth(0,80);
+    table_baseTab->setColumnWidth(0,120);
     table_baseTab->setColumnWidth(1,80);
-    table_baseTab->setColumnWidth(2,80);
-    table_baseTab->setColumnWidth(3,180);
+    table_baseTab->setColumnWidth(2,180);
+    table_baseTab->setColumnWidth(3,160);
     table_baseTab->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
 
     table_baseTab->setContextMenuPolicy(Qt::CustomContextMenu);  //允许自定义右键菜单
@@ -115,7 +115,7 @@ void PacmanerMainGui::querySlot(QString target, QueryMode queryMode, MatchMode m
     connect(this,pQuerySignal,subQueryThread,pStartQuery,Qt::QueuedConnection);
 
     // Result
-    connect(subQueryThread, &QueryThread::queryFinished,[=](QVector<PkgItem*> result){
+    connect(subQueryThread, &QueryThread::queryFinished, [=](QVector<PkgItem*> result){
         qDebug()<<"result size:"<<result.size();
 
         pkgQueryResults = result;
@@ -125,6 +125,8 @@ void PacmanerMainGui::querySlot(QString target, QueryMode queryMode, MatchMode m
             //table_baseTab->setHorizontalHeaderLabels(QStringList()<<"状态"<<"AUR"<<"包名"<<"版本"<<"描述");
 
             table->setRowCount(table->rowCount()+1);
+            int currentRow = table->rowCount()-1;
+
 
             QTableWidgetItem *pkgname = new QTableWidgetItem;
             pkgname->setText(ite->pkgname);
@@ -132,24 +134,49 @@ void PacmanerMainGui::querySlot(QString target, QueryMode queryMode, MatchMode m
             QTableWidgetItem *pkgdesc = new QTableWidgetItem;
             pkgdesc->setText(ite->pkgdesc);
 
+
             QTableWidgetItem *isaur = new QTableWidgetItem;
             if(ite->isAurPkg())
+            {
                 isaur->setIcon(QIcon(":/icons/duihao.png"));
+                isaur->setText("AUR");
+            }
 
             QTableWidgetItem *pkgver = new QTableWidgetItem;
             pkgver->setText(tr("%1-%2").arg(ite->pkgver).arg(ite->pkgrel));
 
-            table->setItem(table->rowCount()-1,1,isaur);
-            table->setItem(table->rowCount()-1,2,pkgname);
-            table->setItem(table->rowCount()-1,3,pkgver);
-            table->setItem(table->rowCount()-1,4,pkgdesc);
-        }
+            // Package Status
 
+            QProcess *pacman = new QProcess;
+            connect(pacman, &QProcess::readyReadStandardError, [=](){
+                QTableWidgetItem *item_status = new QTableWidgetItem;
+
+                item_status->setIcon(QIcon(":/icons/notinstalled.png"));
+                item_status->setText("未安装");
+                table->setItem(currentRow,0,item_status);
+            });
+            connect(pacman, &QProcess::readyReadStandardOutput, [=](){
+                QTableWidgetItem *item_status = new QTableWidgetItem;
+
+                item_status->setText("已安装");
+                item_status->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+                table->setItem(currentRow,0,item_status);
+            });
+            pacman->start(tr("pacman -Q %1").arg(ite->pkgname));
+
+            // Set Items
+            table->setItem(currentRow,1,isaur);
+            table->setItem(currentRow,2,pkgname);
+            table->setItem(currentRow,3,pkgver);
+            table->setItem(currentRow,4,pkgdesc);
+        }
     });
     connect(subQueryThread, &QueryThread::queryFinished,subQueryThread,&QueryThread::deleteLater);
 
     //subQueryThread->startQuery("pacman",QueryMode::OnlyOfficial,MatchMode::NameAndDesc);
     emit querySignal(target,queryMode,matchMode);
+
+
 }
 
 void PacmanerMainGui::baseTableMenu(QPoint pos)
@@ -158,6 +185,7 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
     int y = pos.y ();
     QModelIndex index = table_baseTab->indexAt (QPoint(x,y));
     int row = index.row ();
+    int col = index.column();
     qDebug()<<row;
 
     if(row != -1)
@@ -178,9 +206,27 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
         menu->move (cursor().pos());
         menu->show ();
 
+        if(table_baseTab->item(row,0)->text() == "未安装")
+        {
+            act_uins->setEnabled(false);
+            act_apply->setEnabled(false);
+            act_cancel->setEnabled(false);
+        }
 
+        if(table_baseTab->item(row,0)->text() == "已安装")
+        {
+            act_ins->setEnabled(false);
+            act_apply->setEnabled(false);
+            act_cancel->setEnabled(false);
+        }
 
+        if(table_baseTab->item(row,0)->text() == "准备安装" || table_baseTab->item(row,0)->text() == "准备卸载")
+        {
+            act_ins->setEnabled(false);
+            act_uins->setEnabled(false);
+        }
 
+        // TODO: 连接菜单信号槽
 
         connect(act_info, &QAction::triggered,[=](){
             showPkgInfoViewer(pkgQueryResults.at(row));
@@ -192,6 +238,7 @@ void PacmanerMainGui::showPkgInfoViewer(PkgItem *item)
 {
     if(item->isAurPkg())
     {
+        // Loading Dialog
         QDialog *dialog = new QDialog(this);
         dialog->setWindowFlag(Qt::FramelessWindowHint);
         QVBoxLayout *lay = new QVBoxLayout;
@@ -213,12 +260,13 @@ void PacmanerMainGui::showPkgInfoViewer(PkgItem *item)
         connect(subQueryThread, &QueryThread::queryFinished,[=](){
             dialog->close();
         });
+        // Delete Subthread
         connect(subQueryThread, &QueryThread::queryFinished,subQueryThread,&QueryThread::deleteLater);
+
 
         emit querySignal(item->pkgname,QueryMode::AurInfo,MatchMode::OnlyName);
 
-
-
+        // 使用exec方式，以模态对话框的形式展示，禁止在加载期间用户对主界面进行操作。
         dialog->exec();
 
     }
@@ -234,4 +282,5 @@ void PacmanerMainGui::aurinfoSearchFinished(QVector<PkgItem*> result)
     PkgInfoViewer *viewer = new PkgInfoViewer(result.at(0), this);
     viewer->show();
 }
+
 
