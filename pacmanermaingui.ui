@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PacmanerMainGui</class>
+ <widget class="QMainWindow" name="PacmanerMainGui">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Pacmaner</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="tabPosition">
+       <enum>QTabWidget::West</enum>
+      </property>
+      <property name="tabShape">
+       <enum>QTabWidget::Rounded</enum>
+      </property>
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <property name="elideMode">
+       <enum>Qt::ElideMiddle</enum>
+      </property>
+      <widget class="QWidget" name="tab_base">
+       <attribute name="title">
+        <string>包查询</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tab_aur">
+       <attribute name="title">
+        <string>AUR查询</string>
+       </attribute>
+      </widget>
+      <widget class="QWidget" name="tab_local">
+       <attribute name="title">
+        <string>本地包管理</string>
+       </attribute>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1000</width>
+     <height>32</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>操作</string>
+    </property>
+    <addaction name="act_applyAll"/>
+    <addaction name="act_cancelAll"/>
+    <addaction name="separator"/>
+    <addaction name="act_about"/>
+    <addaction name="separator"/>
+    <addaction name="act_exit"/>
+   </widget>
+   <addaction name="menu"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="act_applyAll">
+   <property name="text">
+    <string>应用所有更改</string>
+   </property>
+  </action>
+  <action name="act_cancelAll">
+   <property name="text">
+    <string>取消所有更改</string>
+   </property>
+  </action>
+  <action name="act_about">
+   <property name="text">
+    <string>关于程序</string>
+   </property>
+  </action>
+  <action name="act_exit">
+   <property name="text">
+    <string>退出</string>
+   </property>
+  </action>
+ </widget>
+ <tabstops>
+  <tabstop>tabWidget</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

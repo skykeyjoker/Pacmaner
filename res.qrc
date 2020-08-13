@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/alreadyinstalled.png</file>
+        <file>icons/icon.png</file>
+        <file>icons/install.png</file>
+        <file>icons/notinstalled.png</file>
+        <file>icons/pkginfo.png</file>
+        <file>icons/remove.png</file>
+        <file>icons/duihao.png</file>
+    </qresource>
+</RCC>
