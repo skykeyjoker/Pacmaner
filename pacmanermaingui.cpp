@@ -7,6 +7,8 @@ PacmanerMainGui::PacmanerMainGui(QWidget *parent)
 {
 
     qRegisterMetaType<PkgItem*>("QVector<PkgItem*>");
+    qRegisterMetaType<Operation*>("QVector<Operation*>");
+    qRegisterMetaType<Operation*>("Operation*");
 
     ui->setupUi(this);
     setWindowIcon(QIcon(QIcon(":/icons/icon.png")));
@@ -227,6 +229,100 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
         }
 
         // TODO: 连接菜单信号槽
+        connect(act_ins, &QAction::triggered, [=](){
+            Operation *ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install);
+            operations.push_back(ope);
+
+            act_apply->setEnabled(true);
+            act_cancel->setEnabled(true);
+
+            table_baseTab->item(row,0)->setIcon(QIcon(":/icons/install.png"));
+            table_baseTab->item(row,0)->setText("准备安装");
+        });
+        connect(act_uins, &QAction::triggered, [=](){
+            Operation *ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall);
+            operations.push_back(ope);
+
+            act_apply->setEnabled(true);
+            act_cancel->setEnabled(true);
+            table_baseTab->item(row,0)->setIcon(QIcon(":/icons/remove.png"));
+            table_baseTab->item(row,0)->setText("准备卸载");
+        });
+
+
+        connect(act_apply,&QAction::triggered,[=](){
+            int ret = QMessageBox::question(this,"请求确认","您确认要应用该操作吗？");
+            if(ret == QMessageBox::Yes)
+            {
+                tmp_operation.clear();
+                Operation *ope;
+                if(table_baseTab->item(row,0)->text() == "准备安装")
+                    ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install);
+                if(table_baseTab->item(row,0)->text() == "准备卸载")
+                    ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall);
+                tmp_operation.push_back(ope);
+
+                QThread *mainOperatorThread = new QThread;
+                OperatorThread *subOperatorThread = new OperatorThread;
+                mainOperatorThread->start();
+                subOperatorThread->moveToThread(mainOperatorThread);
+
+                void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
+                void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
+                connect(this, pApplyOperations, subOperatorThread, pStartOperator);
+                connect(subOperatorThread, &OperatorThread::operationFailed, [=](QString pkgname, QByteArray err){
+                    QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
+                    return;
+                });
+                connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
+                connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
+                connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
+
+
+                emit applyOperations(tmp_operation,"nishisb233..");
+
+                // 更改软件包状态
+                if(table_baseTab->item(row,0)->text() == "准备安装")
+                {
+                    table_baseTab->item(row,0)->setText("已安装");
+                    table_baseTab->item(row,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+
+                }
+
+                if(table_baseTab->item(row,0)->text() == "准备卸载")
+                {
+                    table_baseTab->item(row,0)->setText("未安装");
+                    table_baseTab->item(row,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                }
+                // 从总列表中移除该操作
+                operations.removeAll(ope);
+            }
+        });
+        connect(act_cancel,&QAction::triggered,[=](){
+            int ret = QMessageBox::question(this,"请求确认","您确认要取消该操作吗？");
+            if(ret == QMessageBox::Yes)
+            {
+                if(table_baseTab->item(row,0)->text() == "准备安装")
+                {
+                    table_baseTab->item(row,0)->setText("未安装");
+                    table_baseTab->item(row,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                }
+
+                if(table_baseTab->item(row,0)->text() == "准备卸载")
+                {
+                    table_baseTab->item(row,0)->setText("已安装");
+                    table_baseTab->item(row,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+                }
+
+                // 从列表中移除当前操作
+                for(int i = 0; i<operations.size(); ++i)
+                {
+                    if(operations.at(i)->pkgname == table_baseTab->item(row,2)->text())
+                        operations.remove(i);
+                }
+            }
+        });
+
 
         connect(act_info, &QAction::triggered,[=](){
             showPkgInfoViewer(pkgQueryResults.at(row));
@@ -284,3 +380,81 @@ void PacmanerMainGui::aurinfoSearchFinished(QVector<PkgItem*> result)
 }
 
 
+
+void PacmanerMainGui::on_act_applyAll_triggered()
+{
+    int ret = QMessageBox::question(this, "请求确认", "您确定要应用所有操作吗？");
+
+    if(ret == QMessageBox::Yes)
+    {
+        // TODO 实时操作界面
+        qDebug()<<"Apply All "<<operations.size();
+        QThread *mainOperatorThread = new QThread;
+        OperatorThread *subOperatorThread = new OperatorThread;
+        mainOperatorThread->start();
+        subOperatorThread->moveToThread(mainOperatorThread);
+
+        void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
+        void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
+        connect(this, pApplyOperations, subOperatorThread, pStartOperator);
+        connect(subOperatorThread, &OperatorThread::operationFailed, [=](const QString &pkgname, const QByteArray &err){
+            QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
+            return;
+        });
+        connect(subOperatorThread, &OperatorThread::operationFinished,[=](Operation *ope){
+            // TODO 更新表格包状态
+            operations.removeAll(ope);
+        });
+        connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
+        connect(subOperatorThread, &OperatorThread::allOperationFinished,[=](){
+            qDebug()<<"operations.size: "<<operations.size();
+        });
+        connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
+        connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
+
+
+        emit applyOperations(operations,"nishisb233..");
+        qDebug()<<"applyOperations emit";
+    }
+    else
+        return;
+
+}
+
+// 清除所有操作
+void PacmanerMainGui::on_act_cancelAll_triggered()
+{
+    int ret = QMessageBox::question(this,"请求确认","您确定要取消所有操作吗？");
+
+    if(ret == QMessageBox::Yes)
+    {
+        // 清空容器
+        operations.clear();
+
+        // 还原table图标
+        for(int i = 0; i<table_baseTab->rowCount(); ++i)
+        {
+            if(table_baseTab->item(i,0)->text() == "准备安装")
+            {
+                table_baseTab->item(i,0)->setText("未安装");
+                table_baseTab->item(i,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+            }
+
+            if(table_baseTab->item(i,0)->text() == "准备卸载")
+            {
+                table_baseTab->item(i,0)->setText("已安装");
+                table_baseTab->item(i,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+            }
+        }
+    }
+}
+
+void PacmanerMainGui::on_act_about_triggered()
+{
+
+}
+
+void PacmanerMainGui::on_act_exit_triggered()
+{
+    exit(0);
+}

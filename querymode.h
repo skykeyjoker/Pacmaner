@@ -3,7 +3,7 @@
 
 #include <QMetaType>
 
-enum QueryMode{OnlyOfficial,OnlyAur,OfficialAndAur,AurInfo};
+typedef enum QueryMode{OnlyOfficial,OnlyAur,OfficialAndAur,AurInfo}QueryMode;
 
 Q_DECLARE_METATYPE(QueryMode)
 

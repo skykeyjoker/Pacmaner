@@ -31,6 +31,9 @@
 #include "matchmode.h"
 #include "querythread.h"
 #include "pkginfoviewer.h"
+#include "operation.h"
+#include "operatorthread.h"
+#include "OperationMode.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class PacmanerMainGui; }
@@ -49,6 +52,7 @@ public:
 signals:
     void querySignal(QString target, QueryMode queryMode, MatchMode matchMode);
     void searchBtnClicked(QString target, QueryMode queryMode, MatchMode matchMode, QTableWidget* table);
+    void applyOperations(const QVector<Operation*>&, const QString&);
 
 public slots:
     void querySlot(QString target, QueryMode queryMode, MatchMode matchMode, QTableWidget* table);
@@ -56,6 +60,15 @@ public slots:
     void showPkgInfoViewer(PkgItem* item);
     void aurinfoSearchFinished(QVector<PkgItem*> result);
 
+
+private slots:
+    void on_act_applyAll_triggered();
+
+    void on_act_cancelAll_triggered();
+
+    void on_act_about_triggered();
+
+    void on_act_exit_triggered();
 
 private:
     Ui::PacmanerMainGui *ui;
@@ -69,5 +82,9 @@ private:
     QThread *mainQueryThread;
 
     QVector<PkgItem*> pkgQueryResults;
+    QVector<Operation*> operations;
+    QVector<Operation*> tmp_operation;
+    QString password = "";
+
 };
 #endif // PACMANERMAINGUI_H

@@ -3,6 +3,6 @@
 
 #include <QMetaType>
 
-enum MatchMode{NameAndDesc,OnlyName};
+typedef enum MatchMode{NameAndDesc,OnlyName}MatchMode;
 Q_DECLARE_METATYPE(MatchMode)
 #endif // MATCHMODE_H

@@ -19,15 +19,20 @@ SOURCES += \
     aurpkgitem.cpp \
     main.cpp \
     officialpkgitem.cpp \
+    operation.cpp \
+    operatorthread.cpp \
     pacmanermaingui.cpp \
     pkginfoviewer.cpp \
     pkgitem.cpp \
     querythread.cpp
 
 HEADERS += \
+    OperationMode.h \
     aurpkgitem.h \
     matchmode.h \
     officialpkgitem.h \
+    operation.h \
+    operatorthread.h \
     pacmanermaingui.h \
     pkginfoviewer.h \
     pkgitem.h \
