@@ -254,48 +254,66 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
             int ret = QMessageBox::question(this,"请求确认","您确认要应用该操作吗？");
             if(ret == QMessageBox::Yes)
             {
-                tmp_operation.clear();
-                Operation *ope;
-                if(table_baseTab->item(row,0)->text() == "准备安装")
-                    ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install);
-                if(table_baseTab->item(row,0)->text() == "准备卸载")
-                    ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall);
-                tmp_operation.push_back(ope);
 
-                QThread *mainOperatorThread = new QThread;
-                OperatorThread *subOperatorThread = new OperatorThread;
-                mainOperatorThread->start();
-                subOperatorThread->moveToThread(mainOperatorThread);
+                PasswordHelper *passhelper = new PasswordHelper;
 
-                void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
-                void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
-                connect(this, pApplyOperations, subOperatorThread, pStartOperator);
-                connect(subOperatorThread, &OperatorThread::operationFailed, [=](QString pkgname, QByteArray err){
-                    QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
-                    return;
+                connect(passhelper, &PasswordHelper::passwordAccessible, [=](const QString &pass){
+                    password = pass;
                 });
-                connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
-                connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
-                connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
 
+                passhelper->exec();
 
-                emit applyOperations(tmp_operation,"nishisb233..");
-
-                // 更改软件包状态
-                if(table_baseTab->item(row,0)->text() == "准备安装")
+                if(password.isEmpty())
                 {
-                    table_baseTab->item(row,0)->setText("已安装");
-                    table_baseTab->item(row,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
-
+                    QMessageBox::critical(this, "身份验证失败", "未通过管理员身份验证，停止操作。");
+                    return;
                 }
-
-                if(table_baseTab->item(row,0)->text() == "准备卸载")
+                else
                 {
-                    table_baseTab->item(row,0)->setText("未安装");
-                    table_baseTab->item(row,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                    tmp_operation.clear();
+                    Operation *ope;
+                    if(table_baseTab->item(row,0)->text() == "准备安装")
+                        ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install);
+                    if(table_baseTab->item(row,0)->text() == "准备卸载")
+                        ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall);
+                    tmp_operation.push_back(ope);
+
+
+                    QThread *mainOperatorThread = new QThread;
+                    OperatorThread *subOperatorThread = new OperatorThread;
+                    mainOperatorThread->start();
+                    subOperatorThread->moveToThread(mainOperatorThread);
+
+                    void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
+                    void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
+                    connect(this, pApplyOperations, subOperatorThread, pStartOperator);
+                    connect(subOperatorThread, &OperatorThread::operationFailed, [=](QString pkgname, QByteArray err){
+                        QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
+                        return;
+                    });
+                    connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
+                    connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
+                    connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
+
+
+                    emit applyOperations(tmp_operation,password);
+
+                    // 更改软件包状态
+                    if(table_baseTab->item(row,0)->text() == "准备安装")
+                    {
+                        table_baseTab->item(row,0)->setText("已安装");
+                        table_baseTab->item(row,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+
+                    }
+
+                    if(table_baseTab->item(row,0)->text() == "准备卸载")
+                    {
+                        table_baseTab->item(row,0)->setText("未安装");
+                        table_baseTab->item(row,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                    }
+                    // 从总列表中移除该操作
+                    operations.removeAll(ope);
                 }
-                // 从总列表中移除该操作
-                operations.removeAll(ope);
             }
         });
         connect(act_cancel,&QAction::triggered,[=](){
@@ -387,34 +405,71 @@ void PacmanerMainGui::on_act_applyAll_triggered()
 
     if(ret == QMessageBox::Yes)
     {
-        // TODO 实时操作界面
-        qDebug()<<"Apply All "<<operations.size();
-        QThread *mainOperatorThread = new QThread;
-        OperatorThread *subOperatorThread = new OperatorThread;
-        mainOperatorThread->start();
-        subOperatorThread->moveToThread(mainOperatorThread);
+        PasswordHelper *passhelper = new PasswordHelper;
 
-        void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
-        void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
-        connect(this, pApplyOperations, subOperatorThread, pStartOperator);
-        connect(subOperatorThread, &OperatorThread::operationFailed, [=](const QString &pkgname, const QByteArray &err){
-            QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
+        connect(passhelper, &PasswordHelper::passwordAccessible, [=](const QString &pass){
+            password = pass;
+        });
+
+        passhelper->exec();
+
+        if(password.isEmpty())
+        {
+            QMessageBox::critical(this, "身份验证失败", "未通过管理员身份验证，停止操作。");
             return;
-        });
-        connect(subOperatorThread, &OperatorThread::operationFinished,[=](Operation *ope){
-            // TODO 更新表格包状态
-            operations.removeAll(ope);
-        });
-        connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
-        connect(subOperatorThread, &OperatorThread::allOperationFinished,[=](){
-            qDebug()<<"operations.size: "<<operations.size();
-        });
-        connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
-        connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
+        }
+        else
+        {
+            // TODO 实时操作界面
+
+            qDebug()<<"Apply All "<<operations.size();
+            QThread *mainOperatorThread = new QThread;
+            OperatorThread *subOperatorThread = new OperatorThread;
+            mainOperatorThread->start();
+            subOperatorThread->moveToThread(mainOperatorThread);
+
+            void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
+            void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
+            connect(this, pApplyOperations, subOperatorThread, pStartOperator);
+            connect(subOperatorThread, &OperatorThread::operationFailed, [=](const QString &pkgname, const QByteArray &err){
+                QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
+                return;
+            });
+            connect(subOperatorThread, &OperatorThread::operationFinished,[=](Operation *ope){
+                // 更新表格包状态
+                for(int i = 0; i<table_baseTab->rowCount(); ++i)
+                {
+                    if(table_baseTab->item(i,2)->text()==ope->pkgname)
+                    {
+                        if(table_baseTab->item(i,0)->text() == "准备安装")
+                        {
+                            table_baseTab->item(i,0)->setText("已安装");
+                            table_baseTab->item(i,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+
+                        }
+
+                        if(table_baseTab->item(i,0)->text() == "准备卸载")
+                        {
+                            table_baseTab->item(i,0)->setText("未安装");
+                            table_baseTab->item(i,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                        }
+                        break;
+                    }
+                }
+                // 从容器中移除当前操作
+                operations.removeAll(ope);
+            });
+            connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
+            connect(subOperatorThread, &OperatorThread::allOperationFinished,[=](){
+                qDebug()<<"operations.size: "<<operations.size();
+            });
+            connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
+            connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
 
 
-        emit applyOperations(operations,"nishisb233..");
-        qDebug()<<"applyOperations emit";
+            emit applyOperations(operations,password);
+            qDebug()<<"applyOperations emit";
+        }
     }
     else
         return;

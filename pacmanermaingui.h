@@ -34,6 +34,7 @@
 #include "operation.h"
 #include "operatorthread.h"
 #include "OperationMode.h"
+#include "passwordhelper.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class PacmanerMainGui; }

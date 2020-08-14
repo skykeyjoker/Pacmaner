@@ -22,6 +22,7 @@ SOURCES += \
     operation.cpp \
     operatorthread.cpp \
     pacmanermaingui.cpp \
+    passwordhelper.cpp \
     pkginfoviewer.cpp \
     pkgitem.cpp \
     querythread.cpp
@@ -34,6 +35,7 @@ HEADERS += \
     operation.h \
     operatorthread.h \
     pacmanermaingui.h \
+    passwordhelper.h \
     pkginfoviewer.h \
     pkgitem.h \
     querymode.h \
