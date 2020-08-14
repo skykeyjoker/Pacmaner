@@ -19,14 +19,19 @@ void OperatorThread::startOperator(const QVector<Operation *> &_operations, cons
     {
         connect(pacman, &QProcess::readyReadStandardError, [=](){
             QByteArray err = pacman->readAllStandardError();
-            emit operationFailed(ite->pkgname, err);
+            if(!ite->isAur)
+                emit operationFailed(ite->pkgname, err);
         });
 
         if(ite->mode == OperationMode::Install)
         {
             qDebug()<<"Install: "<<ite->pkgname;
             echo->start(tr("echo %1").arg(_password));
-            pacman->start(tr("sudo -S pacman -S %1 --noconfirm --noprogressbar -q").arg(ite->pkgname));
+
+            if(!ite->isAur)
+                pacman->start(tr("sudo -S pacman -S %1 --noconfirm --noprogressbar -q").arg(ite->pkgname));
+            else
+                pacman->start(tr("yay -S %1 --noconfirm --noprogressbar -q --sudoloop --sudoflags -S").arg(ite->pkgname));
             pacman->waitForFinished();
 
             qDebug()<<"Installed: "<<ite->pkgname;

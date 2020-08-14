@@ -187,7 +187,6 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
     int y = pos.y ();
     QModelIndex index = table_baseTab->indexAt (QPoint(x,y));
     int row = index.row ();
-    int col = index.column();
     qDebug()<<row;
 
     if(row != -1)
@@ -230,7 +229,11 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
 
         // TODO: 连接菜单信号槽
         connect(act_ins, &QAction::triggered, [=](){
-            Operation *ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install);
+            Operation *ope;
+            if(table_baseTab->item(row,1)->text() == "AUR")
+                ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install,true);
+            else
+                ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install,false);
             operations.push_back(ope);
 
             act_apply->setEnabled(true);
@@ -240,7 +243,11 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
             table_baseTab->item(row,0)->setText("准备安装");
         });
         connect(act_uins, &QAction::triggered, [=](){
-            Operation *ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall);
+            Operation *ope;
+            if(table_baseTab->item(row,1)->text() == "AUR")
+                ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall,true);
+            else
+                ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall,false);
             operations.push_back(ope);
 
             act_apply->setEnabled(true);
@@ -273,9 +280,19 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                     tmp_operation.clear();
                     Operation *ope;
                     if(table_baseTab->item(row,0)->text() == "准备安装")
-                        ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install);
+                    {
+                        if(table_baseTab->item(row,1)->text() == "AUR")
+                            ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install,true);
+                        else
+                            ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install,false);
+                    }
                     if(table_baseTab->item(row,0)->text() == "准备卸载")
-                        ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall);
+                    {
+                        if(table_baseTab->item(row,1)->text() == "AUR")
+                            ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall,true);
+                        else
+                            ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall,false);
+                    }
                     tmp_operation.push_back(ope);
 
 
