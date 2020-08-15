@@ -3,6 +3,7 @@
 PasswordHelper::PasswordHelper(QWidget *parent) : QDialog(parent)
 {
     setWindowTitle("管理员权限获取");
+    setWindowIcon(QIcon(":/icons/author.png"));
     setWindowFlag(Qt::Dialog);
     setFixedSize(QSize(550,125));
 

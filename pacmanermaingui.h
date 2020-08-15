@@ -34,6 +34,7 @@
 #include "operation.h"
 #include "operatorthread.h"
 #include "OperationMode.h"
+#include "operationsgui.h"
 #include "passwordhelper.h"
 
 QT_BEGIN_NAMESPACE
@@ -84,8 +85,13 @@ private:
 
     QVector<PkgItem*> pkgQueryResults;
     QVector<Operation*> operations;
+    QVector<Operation*> ins_operations;
+    QVector<Operation*> uni_operations;
     QVector<Operation*> tmp_operation;
     QString password = "";
+
+    //int insCount = 0;
+    //int uninsCount = 0;
 
 };
 #endif // PACMANERMAINGUI_H

@@ -7,5 +7,7 @@
         <file>icons/pkginfo.png</file>
         <file>icons/remove.png</file>
         <file>icons/duihao.png</file>
+        <file>icons/author.png</file>
+        <file>icons/progress.png</file>
     </qresource>
 </RCC>

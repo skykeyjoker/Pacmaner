@@ -13,6 +13,7 @@ PacmanerMainGui::PacmanerMainGui(QWidget *parent)
     ui->setupUi(this);
     setWindowIcon(QIcon(QIcon(":/icons/icon.png")));
 
+
     // Thread
     mainQueryThread = new QThread;
     mainQueryThread->start();
@@ -234,7 +235,10 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                 ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install,true);
             else
                 ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Install,false);
+
+            //压入操作队列
             operations.push_back(ope);
+            ins_operations.push_back(ope);
 
             act_apply->setEnabled(true);
             act_cancel->setEnabled(true);
@@ -248,7 +252,10 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                 ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall,true);
             else
                 ope = new Operation(table_baseTab->item(row,2)->text(),OperationMode::Uinstall,false);
+
+            //压入操作队列
             operations.push_back(ope);
+            uni_operations.push_back(ope);
 
             act_apply->setEnabled(true);
             act_cancel->setEnabled(true);
@@ -278,6 +285,7 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                 else
                 {
                     tmp_operation.clear();
+
                     Operation *ope;
                     if(table_baseTab->item(row,0)->text() == "准备安装")
                     {
@@ -308,6 +316,34 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                         QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
                         return;
                     });
+                    connect(subOperatorThread, &OperatorThread::operationFinished, [=](Operation* o){
+                        // 从总列表中移除该操
+                        for(int i = 0; i<operations.size(); ++i)
+                        {
+                            if(operations.at(i)->pkgname == o->pkgname)
+                            {
+                                qDebug()<<"operation found";
+                                operations.remove(i);
+                            }
+                        }
+                        for(int i = 0; i<ins_operations.size(); ++i)
+                        {
+                            if(ins_operations.at(i)->pkgname == o->pkgname)
+                            {
+                                qDebug()<<"ins_operations found";
+                                ins_operations.remove(i);
+                            }
+                        }
+                        for(int i = 0; i<uni_operations.size(); ++i)
+                        {
+                            if(uni_operations.at(i)->pkgname == o->pkgname)
+                            {
+                                qDebug()<<"uni_operations found";
+                                uni_operations.remove(i);
+                            }
+                        }
+
+                    });
                     connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
                     connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
                     connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
@@ -328,8 +364,6 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                         table_baseTab->item(row,0)->setText("未安装");
                         table_baseTab->item(row,0)->setIcon(QIcon(":/icons/notinstalled.png"));
                     }
-                    // 从总列表中移除该操作
-                    operations.removeAll(ope);
                 }
             }
         });
@@ -355,6 +389,21 @@ void PacmanerMainGui::baseTableMenu(QPoint pos)
                     if(operations.at(i)->pkgname == table_baseTab->item(row,2)->text())
                         operations.remove(i);
                 }
+
+
+                for(int i = 0; i<ins_operations.size(); ++i)
+                {
+                    if(ins_operations.at(i)->pkgname == table_baseTab->item(row,2)->text())
+                        ins_operations.remove(i);
+                }
+
+
+                for(int i = 0; i<uni_operations.size(); ++i)
+                {
+                    if(uni_operations.at(i)->pkgname == table_baseTab->item(row,2)->text())
+                        uni_operations.remove(i);
+                }
+
             }
         });
 
@@ -418,79 +467,122 @@ void PacmanerMainGui::aurinfoSearchFinished(QVector<PkgItem*> result)
 
 void PacmanerMainGui::on_act_applyAll_triggered()
 {
-    int ret = QMessageBox::question(this, "请求确认", "您确定要应用所有操作吗？");
-
-    if(ret == QMessageBox::Yes)
+    if(!operations.isEmpty())
     {
-        PasswordHelper *passhelper = new PasswordHelper;
+        int ret = QMessageBox::question(this, "请求确认",
+                                        tr("您确定要应用所有操作吗？\n本次将安装%1个软件包，卸载%2个软件包").arg(ins_operations.size()).arg(uni_operations.size()));
 
-        connect(passhelper, &PasswordHelper::passwordAccessible, [=](const QString &pass){
-            password = pass;
-        });
-
-        passhelper->exec();
-
-        if(password.isEmpty())
+        if(ret == QMessageBox::Yes)
         {
-            QMessageBox::critical(this, "身份验证失败", "未通过管理员身份验证，停止操作。");
-            return;
-        }
-        else
-        {
-            // TODO 实时操作界面
+            PasswordHelper *passhelper = new PasswordHelper;
 
-            qDebug()<<"Apply All "<<operations.size();
-            QThread *mainOperatorThread = new QThread;
-            OperatorThread *subOperatorThread = new OperatorThread;
-            mainOperatorThread->start();
-            subOperatorThread->moveToThread(mainOperatorThread);
-
-            void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
-            void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
-            connect(this, pApplyOperations, subOperatorThread, pStartOperator);
-            connect(subOperatorThread, &OperatorThread::operationFailed, [=](const QString &pkgname, const QByteArray &err){
-                QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
-                return;
+            connect(passhelper, &PasswordHelper::passwordAccessible, [=](const QString &pass){
+                password = pass;
             });
-            connect(subOperatorThread, &OperatorThread::operationFinished,[=](Operation *ope){
-                // 更新表格包状态
-                for(int i = 0; i<table_baseTab->rowCount(); ++i)
-                {
-                    if(table_baseTab->item(i,2)->text()==ope->pkgname)
+
+            passhelper->exec();
+
+            if(password.isEmpty())
+            {
+                QMessageBox::critical(this, "身份验证失败", "未通过管理员身份验证，停止操作。");
+                return;
+            }
+            else
+            {
+                // TODO 实时操作界面
+                OperationsGUI *progressWindow = new OperationsGUI(operations,this);
+
+                qDebug()<<"Apply All "<<operations.size();
+                QThread *mainOperatorThread = new QThread;
+                OperatorThread *subOperatorThread = new OperatorThread;
+                mainOperatorThread->start();
+                subOperatorThread->moveToThread(mainOperatorThread);
+
+                void (PacmanerMainGui::*pApplyOperations)(const QVector<Operation*>&, const QString&) = &PacmanerMainGui::applyOperations;
+                void (OperatorThread::*pStartOperator)(const QVector<Operation*>&, const QString&) = &OperatorThread::startOperator;
+                connect(this, pApplyOperations, subOperatorThread, pStartOperator);
+                connect(subOperatorThread, &OperatorThread::operationFailed, [=](const QString &pkgname, const QByteArray &err){
+                    QMessageBox::critical(this, "操作失败",tr("应用操作失败！\n%1:\n%2").arg(pkgname).arg(QString::fromLocal8Bit(err)));
+                    return;
+                });
+                connect(subOperatorThread, &OperatorThread::operationFinished,[=](Operation *ope){
+                    // 更新表格包状态
+                    for(int i = 0; i<table_baseTab->rowCount(); ++i)
                     {
-                        if(table_baseTab->item(i,0)->text() == "准备安装")
+                        if(table_baseTab->item(i,2)->text()==ope->pkgname)
                         {
-                            table_baseTab->item(i,0)->setText("已安装");
-                            table_baseTab->item(i,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
+                            if(table_baseTab->item(i,0)->text() == "准备安装")
+                            {
+                                table_baseTab->item(i,0)->setText("已安装");
+                                table_baseTab->item(i,0)->setIcon(QIcon(":/icons/alreadyinstalled.png"));
 
+                            }
+
+                            if(table_baseTab->item(i,0)->text() == "准备卸载")
+                            {
+                                table_baseTab->item(i,0)->setText("未安装");
+                                table_baseTab->item(i,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                            }
+                            break;
                         }
+                    }
 
-                        if(table_baseTab->item(i,0)->text() == "准备卸载")
+                    // 从容器中移除当前操作
+                    for(int i = 0; i<operations.size(); ++i)
+                    {
+                        if(operations.at(i)->pkgname == ope->pkgname)
                         {
-                            table_baseTab->item(i,0)->setText("未安装");
-                            table_baseTab->item(i,0)->setIcon(QIcon(":/icons/notinstalled.png"));
+                            qDebug()<<"operation found";
+                            operations.remove(i);
                         }
                         break;
                     }
-                }
-                // 从容器中移除当前操作
-                operations.removeAll(ope);
-            });
-            connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
-            connect(subOperatorThread, &OperatorThread::allOperationFinished,[=](){
-                qDebug()<<"operations.size: "<<operations.size();
-            });
-            connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
-            connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
+                    for(int i = 0; i<ins_operations.size(); ++i)
+                    {
+                        if(ins_operations.at(i)->pkgname == ope->pkgname)
+                        {
+                            qDebug()<<"ins_operations found";
+                            ins_operations.remove(i);
+                        }
+                        break;
+                    }
+                    for(int i = 0; i<uni_operations.size(); ++i)
+                    {
+                        if(uni_operations.at(i)->pkgname == ope->pkgname)
+                        {
+                            qDebug()<<"uni_operations found";
+                            uni_operations.remove(i);
+                        }
+                        break;
+                    }
 
 
-            emit applyOperations(operations,password);
-            qDebug()<<"applyOperations emit";
+                    progressWindow->updateProgress();
+                });
+                connect(subOperatorThread, &OperatorThread::allOperationFinished,[=](){
+                    qDebug()<<"operations.size: "<<operations.size();
+                    operations.clear();
+                    ins_operations.clear();
+                    uni_operations.clear();
+                });
+                connect(subOperatorThread, &OperatorThread::allOperationFinished, subOperatorThread, &OperatorThread::deleteLater);
+                connect(subOperatorThread,&OperatorThread::destroyed, mainOperatorThread, &QThread::quit);
+                connect(mainOperatorThread,&QThread::finished, mainOperatorThread, &QThread::deleteLater);
+
+
+                emit applyOperations(operations,password);
+                qDebug()<<"applyOperations emit";
+
+                progressWindow->exec();
+            }
         }
+        else
+            return;
     }
     else
-        return;
-
+    {
+        QMessageBox::critical(this,"错误", "当前操作队列为空！");
+    }
 }
 
 // 清除所有操作
@@ -502,6 +594,8 @@ void PacmanerMainGui::on_act_cancelAll_triggered()
     {
         // 清空容器
         operations.clear();
+        ins_operations.clear();
+        uni_operations.clear();
 
         // 还原table图标
         for(int i = 0; i<table_baseTab->rowCount(); ++i)

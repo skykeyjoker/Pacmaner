@@ -20,6 +20,7 @@ SOURCES += \
     main.cpp \
     officialpkgitem.cpp \
     operation.cpp \
+    operationsgui.cpp \
     operatorthread.cpp \
     pacmanermaingui.cpp \
     passwordhelper.cpp \
@@ -33,6 +34,7 @@ HEADERS += \
     matchmode.h \
     officialpkgitem.h \
     operation.h \
+    operationsgui.h \
     operatorthread.h \
     pacmanermaingui.h \
     passwordhelper.h \
